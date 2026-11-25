@@ -5,10 +5,11 @@ import ModuleIcon from './ModuleIcon.jsx';
 import Icon from './Icon.jsx';
 
 /** Full-width dark order summary shown under the price table. */
-export default function TotalsBox({ state, totals: t, onPay }) {
+export default function TotalsBox({ state, totals: t, onPay, onSupport }) {
   const yearly = state.cycle === 'yearly';
   const cyc = cycleWord(state.cycle);
-  const yearlySaving = round2(t.monthly * 12 * CONFIG.YEARLY_DISCOUNT);
+  const yearlySaving = round2(t.netMonthly * 12 * CONFIG.YEARLY_DISCOUNT);
+  const isEnt = state.plan === 'enterprise';
 
   return (
     <div className="summary-card">
@@ -48,6 +49,23 @@ export default function TotalsBox({ state, totals: t, onPay }) {
             <span className="k">Subtotal{monthsOf(state.cycle) > 1 ? ` (${inr(t.monthly)} × 12)` : ''}</span>
             <AnimatedNumber className="v" value={t.subtotal} />
           </div>
+          {t.launchDiscount > 0 && (
+            <div className="offer-box">
+              <span className="offer-ico" aria-hidden="true">
+                <Icon name="sparkle" size={16} />
+              </span>
+              <span className="offer-text">
+                <span className="offer-title">
+                  Offer applied <span className="offer-pill">−{Math.round((1 - CONFIG.enterprise.price / CONFIG.enterprise.mrp) * 100)}%</span>
+                </span>
+                <span className="offer-sub">
+                  Enterprise at <b>{inr(CONFIG.enterprise.price)}</b>/month <s>{inr(CONFIG.enterprise.mrp)}</s>
+                  {yearly && <> · {inr(CONFIG.enterprise.mrp - CONFIG.enterprise.price)} × 12 months</>}
+                </span>
+              </span>
+              <AnimatedNumber className="offer-v" prefix="− " value={t.launchDiscount} />
+            </div>
+          )}
           {t.discount > 0 && (
             <div className="line disc">
               <span className="k">Yearly discount (20%)</span>
@@ -69,10 +87,12 @@ export default function TotalsBox({ state, totals: t, onPay }) {
             {yearly && !t.empty ? `≈ ${inr(round2(t.total / 12))} / month incl. GST` : 'Incl. 18% GST'}
           </div>
           {!t.empty && (
-            <div className={`sc-save ${yearly ? 'on' : ''}`}>
+            <div className={`sc-save ${yearly || t.launchDiscount ? 'on' : ''}`}>
               <Icon name="sparkle" size={14} />
-              {yearly
-                ? `You're saving ${inr(t.discount)} with yearly billing`
+              {t.launchDiscount || yearly
+                ? `You're saving ${inr(round2(t.launchDiscount + t.discount))}${
+                    t.launchDiscount && yearly ? ' with the offer + yearly billing' : yearly ? ' with yearly billing' : ' with the offer'
+                  }`
                 : `Switch to yearly and save ${inr(yearlySaving)}`}
             </div>
           )}
@@ -80,6 +100,9 @@ export default function TotalsBox({ state, totals: t, onPay }) {
         <div className="sc-actions">
           <button className="btn btn-pay" type="button" disabled={t.empty} onClick={onPay}>
             Pay Now <Icon name="arrow" size={16} />
+          </button>
+          <button className="btn btn-support" type="button" onClick={onSupport}>
+            <Icon name="support" size={17} /> {isEnt ? 'Dedicated Support' : 'Customer Support'}
           </button>
         </div>
         <p className="sc-secure">

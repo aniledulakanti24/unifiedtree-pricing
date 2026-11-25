@@ -43,7 +43,7 @@ const PLAN_OPTIONS = [
     features: [
       `HRMS for ${modById('hrms').included} + CRM for ${modById('crm').included}`,
       'Accounting, Manufacturing, Marketing & more',
-      `Add users or employees at ${inr(CONFIG.enterprise.extraPrice)} each`,
+      `Extra users from ${inr(Math.min(...CONFIG.enterprise.modules.filter((m) => m.extraPrice).map((m) => m.extraPrice)))} / month`,
     ],
     cta: 'Get the full suite',
   },
@@ -64,7 +64,7 @@ const CYCLE_OPTIONS = [
 
 export default function App() {
   const [state, setState] = useState(initialState);
-  const [modal, setModal] = useState(null); // 'pay' | 'sales' | null
+  const [modal, setModal] = useState(null); // 'pay' | 'sales' | 'support' | null
 
   const totals = computeTotals(state);
   const isCustom = state.plan === 'custom';
@@ -74,8 +74,8 @@ export default function App() {
   const togglePick = (id) =>
     setState((s) => ({ ...s, individual: { ...s.individual, [id]: { ...s.individual[id], on: !s.individual[id].on } } }));
 
-  const setQty = (plan, id, val) =>
-    setState((s) => ({ ...s, [plan]: { ...s[plan], [id]: { ...s[plan][id], qty: clampQty(plan, id, val) } } }));
+  const setQty = (plan, id, val, field = 'qty') =>
+    setState((s) => ({ ...s, [plan]: { ...s[plan], [id]: { ...s[plan][id], [field]: clampQty(plan, id, val, field) } } }));
 
   const removeModule = (id) =>
     setState((s) => ({ ...s, individual: { ...s.individual, [id]: { ...s.individual[id], on: false } } }));
@@ -109,7 +109,7 @@ export default function App() {
               onRemove={removeModule}
               onAdd={togglePick}
               onPay={() => setModal('pay')}
-              onSales={() => setModal('sales')}
+              onSupport={() => setModal('support')}
             />
           )}
         </div>
@@ -119,6 +119,13 @@ export default function App() {
 
       <PayModal open={modal === 'pay'} onClose={() => setModal(null)} state={state} totals={totals} />
       <SalesModal open={modal === 'sales'} onClose={() => setModal(null)} state={state} totals={totals} />
+      <SalesModal
+        open={modal === 'support'}
+        onClose={() => setModal(null)}
+        state={state}
+        totals={totals}
+        variant={state.plan === 'enterprise' ? 'dedicated' : 'support'}
+      />
     </>
   );
 }

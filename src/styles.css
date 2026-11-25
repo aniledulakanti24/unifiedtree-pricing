@@ -582,11 +582,6 @@ tr.masked:hover .add-btn, .add-btn:hover { background: var(--brand); color: #fff
 
 /* Price table: spread columns evenly across the full card width */
 .price-table { table-layout: fixed; width: 100%; }
-.price-table .c-mod { width: 31%; }
-.price-table .c-price { width: 13%; }
-.price-table .c-def { width: 20%; }
-.price-table .c-add { width: 18%; }
-.price-table .c-total { width: 18%; }
 .price-table th:last-child, .price-table td:last-child { padding-right: 32px; }
 .price-table td:last-child strong { font-size: 17px; letter-spacing: -.01em; }
 .wrap { max-width: 1240px; }
@@ -698,3 +693,44 @@ tr.masked:hover .add-btn, .add-btn:hover { background: var(--brand); color: #fff
 @media (max-width: 720px) {
   .plan-cards { grid-template-columns: 1fr; gap: 16px; max-width: 420px; }
 }
+
+/* ================= v13: Organization column ================= */
+.price-table { min-width: 1000px; }
+.price-table .c-mod { width: 26%; }
+.price-table .c-price { width: 11%; }
+.price-table .c-def { width: 17%; }
+.price-table .c-add { width: 17%; }
+.price-table .c-org { width: 15%; }
+.price-table .c-total { width: 14%; }
+.price-table th, .price-table td { padding-left: 16px; padding-right: 16px; }
+.price-table td:first-child, .price-table th:first-child { padding-left: 22px; }
+.price-table .rate { white-space: normal; }
+
+/* ================= v14: launch offer line + support button ================= */
+.sc-actions { flex-direction: column; }
+.sc-actions .btn { flex: none; width: 100%; }
+.btn-support { background: rgba(255,255,255,.06); color: #fff; border: 1.5px solid rgba(255,255,255,.25); }
+.btn-support:hover:not(:disabled) { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.55); }
+.btn-support .icon { color: #6ee7b7; }
+.btn-support:hover:not(:disabled) .icon { transform: none; }
+.launch-line .k { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.offer-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 800; letter-spacing: .02em;
+  color: #3b2300; background: linear-gradient(135deg, #fde68a, #f59e0b); padding: 2px 8px; border-radius: 999px; }
+
+/* ================= v15: offer box in order summary ================= */
+.offer-box { position: relative; overflow: hidden; display: flex; align-items: center; gap: 12px; margin: 8px 0; padding: 12px 14px;
+  border-radius: 14px; border: 1px dashed rgba(251,191,36,.55);
+  background: linear-gradient(110deg, rgba(251,191,36,.16), rgba(245,158,11,.06) 60%, rgba(52,211,153,.08)); }
+.offer-box::after { content: ""; position: absolute; top: 0; left: -40%; width: 30%; height: 100%; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.12), transparent); transform: skewX(-20deg);
+  animation: shine 4.5s ease-in-out infinite; }
+.offer-ico { width: 34px; height: 34px; flex: none; border-radius: 10px; display: grid; place-items: center; color: #3b2300;
+  background: linear-gradient(140deg, #fde68a, #f59e0b); box-shadow: 0 6px 14px -4px rgba(245,158,11,.6); }
+.offer-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.offer-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14.5px; color: #fde68a; }
+.offer-pill { font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; color: #3b2300; background: #fbbf24; }
+.offer-sub { font-size: 12.5px; color: #c9b98a; }
+.offer-sub b { color: #fff; font-weight: 700; }
+.offer-sub s { color: #9a8a63; margin-left: 2px; }
+.offer-v { font-size: 17px; font-weight: 800; color: #fde68a; white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (max-width: 480px) { .offer-box { flex-wrap: wrap; } .offer-v { margin-left: 46px; } }

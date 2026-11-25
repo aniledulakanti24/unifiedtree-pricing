@@ -1,13 +1,12 @@
-import { CONFIG, TAGLINES } from '../config.js';
-import { inr, round2, monthsOf, cycleWord, individualRows, enterpriseRows, minQty } from '../pricing.js';
+import { CONFIG, TAGLINES, extraRateUnit } from '../config.js';
+import { inr, monthsOf, cycleWord, individualRows, enterpriseRows, minQty } from '../pricing.js';
 import ModuleIcon from './ModuleIcon.jsx';
-import Icon from './Icon.jsx';
 import Stepper from './Stepper.jsx';
 import AnimatedNumber from './AnimatedNumber.jsx';
 import TotalsBox from './TotalsBox.jsx';
 
 /** Step 2 (individual) or the Enterprise plan — the price table plus totals. */
-export default function PricingCard({ state, totals, onQty, onRemove, onAdd, onPay, onSales }) {
+export default function PricingCard({ state, totals, onQty, onRemove, onAdd, onPay, onSupport }) {
   const m = monthsOf(state.cycle);
   const cyc = cycleWord(state.cycle);
   const isEnt = state.plan === 'enterprise';
@@ -15,7 +14,7 @@ export default function PricingCard({ state, totals, onQty, onRemove, onAdd, onP
   return (
     <div className="checkout step-in">
     <section className="card" aria-live="polite">
-      <div className="card-head animate">{isEnt ? <EnterpriseHead m={m} cyc={cyc} /> : <IndividualHead state={state} />}</div>
+      <div className="card-head animate">{isEnt ? <EnterpriseHead /> : <IndividualHead state={state} />}</div>
 
       <div className="table-wrap">
         <table className="price-table">
@@ -24,6 +23,7 @@ export default function PricingCard({ state, totals, onQty, onRemove, onAdd, onP
             <col className="c-price" />
             <col className="c-def" />
             <col className="c-add" />
+            <col className="c-org" />
             <col className="c-total" />
           </colgroup>
           <thead>
@@ -32,6 +32,7 @@ export default function PricingCard({ state, totals, onQty, onRemove, onAdd, onP
               <th className="num">Price</th>
               <th>Default</th>
               <th>Additional</th>
+              <th>Organization</th>
               <th className="num">Total / {cyc}</th>
             </tr>
           </thead>
@@ -48,7 +49,7 @@ export default function PricingCard({ state, totals, onQty, onRemove, onAdd, onP
       <Notes isEnt={isEnt} />
     </section>
     <aside className="side">
-      <TotalsBox state={state} totals={totals} onPay={onPay} onSales={onSales} />
+      <TotalsBox state={state} totals={totals} onPay={onPay} onSupport={onSupport} />
     </aside>
     </div>
   );
@@ -61,29 +62,17 @@ function IndividualHead({ state }) {
       <h2>
         Build your plan <span className="count-chip">{count} of {CONFIG.individual.length} selected</span>
       </h2>
-      <p>Click “+ Add module” on the modules you need, then add extra access or employees. Every module includes 3 access (1 admin + 2 others).</p>
+      <p>Click “+ Add module” on the modules you need, then add extra access, employees or organizations. Every module includes 3 access (1 admin + 2 others).</p>
     </div>
   );
 }
 
-function EnterpriseHead({ m, cyc }) {
-  const E = CONFIG.enterprise;
-  const now = round2(E.price * m * (m > 1 ? 1 - CONFIG.YEARLY_DISCOUNT : 1));
+function EnterpriseHead() {
   return (
     <>
       <div>
-        <span className="launch"><Icon name="sparkle" size={13} /> Launch offer</span>
         <h2>Enterprise</h2>
-        <p>All 6 modules in one plan. Add more access or employees any time.</p>
-      </div>
-      <div className="offer">
-        <span className="mrp">{inr(E.mrp * m)}</span>
-        <AnimatedNumber className="now" value={now} />
-        <span className="per">
-          / {cyc}
-          {m > 1 ? ' after 20% off' : ''} + 18% GST
-        </span>
-        <span className="save-chip">You save {inr((E.mrp - E.price) * m)}</span>
+        <p>All 6 modules in one plan. Add more access, employees or organizations any time.</p>
       </div>
     </>
   );
@@ -119,6 +108,9 @@ function IndividualRows({ state, m, cyc, onQty, onRemove, onAdd }) {
             + Add module
           </button>
         </td>
+        <td>
+          <span className="zero">—</span>
+        </td>
         <td className="num">
           <span className="zero">—</span>
         </td>
@@ -149,9 +141,10 @@ function IndividualRows({ state, m, cyc, onQty, onRemove, onAdd }) {
         <td>
           <Stepper value={s.qty} min={minQty('individual', mod.id)} onChange={(v) => onQty('individual', mod.id, v)} />
           <div className="rate">
-            {mod.perUnit ? `No. of ${mod.unitLabel}` : `${inr(mod.extraPrice * m)} each / ${cyc}`}
+            {mod.perUnit ? `No. of ${mod.unitLabel}` : <ExtraRate mod={mod} qty={s.qty} m={m} cyc={cyc} />}
           </div>
         </td>
+        <OrgCell plan="individual" mod={mod} s={s} m={m} cyc={cyc} onQty={onQty} />
         <td className="num">
           <strong className={monthly ? '' : 'zero'}>
             <AnimatedNumber value={monthly * m} />
@@ -177,18 +170,21 @@ function EnterpriseRows({ state, m, cyc, onQty }) {
           </div>
         </td>
         <td className="num">
-          {inr(E.price * m)}
-          <div className="rate">
-            <s>{inr(E.mrp * m)}</s> / {cyc}
-          </div>
+          {inr(E.mrp * m)}
+          <div className="rate">/ {cyc}</div>
         </td>
         <td>
           <span className="pill">All modules</span>
         </td>
-        <td>—</td>
+        <td>
+          <span className="zero">—</span>
+        </td>
+        <td>
+          <span className="zero">—</span>
+        </td>
         <td className="num">
           <strong>
-            <AnimatedNumber value={E.price * m} />
+            <AnimatedNumber value={E.mrp * m} />
           </strong>
         </td>
       </tr>
@@ -207,12 +203,19 @@ function EnterpriseRows({ state, m, cyc, onQty }) {
           <td>
             <span className="pill">{mod.included}</span>
           </td>
-          <td>
-            <Stepper value={s.qty} min={0} onChange={(v) => onQty('enterprise', mod.id, v)} />
-            <div className="rate">
-              {inr(E.extraPrice * m)} each / {cyc}
-            </div>
-          </td>
+          {mod.extraPrice ? (
+            <td>
+              <Stepper value={s.qty} min={0} onChange={(v) => onQty('enterprise', mod.id, v)} />
+              <div className="rate">
+                <ExtraRate mod={mod} qty={s.qty} m={m} cyc={cyc} />
+              </div>
+            </td>
+          ) : (
+            <td>
+              <span className="zero" title={`No add-ons for ${mod.name} on Enterprise`}>—</span>
+            </td>
+          )}
+          <OrgCell plan="enterprise" mod={mod} s={s} m={m} cyc={cyc} onQty={onQty} />
           <td className="num">
             <strong className={monthly ? '' : 'zero'}>
               <AnimatedNumber value={monthly * m} />
@@ -224,6 +227,19 @@ function EnterpriseRows({ state, m, cyc, onQty }) {
   );
 }
 
+/** "5 access = 1 admin + 4 other users, included with Accounting, Manufacturing and Docuchat." — built from the config. */
+function accessNotes(modules) {
+  const groups = {};
+  modules.forEach((m) => {
+    const n = Number((m.included.match(/(\d+)\s+access/) || [])[1]);
+    if (n) (groups[n] ||= []).push(m.name);
+  });
+  const list = (a) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}` : a[0]);
+  return Object.entries(groups).map(
+    ([n, names]) => `${n} access = 1 admin + ${n - 1} other user${n - 1 === 1 ? '' : 's'}, included with ${list(names)}.`,
+  );
+}
+
 function Notes({ isEnt }) {
   const E = CONFIG.enterprise;
   return (
@@ -232,20 +248,58 @@ function Notes({ isEnt }) {
       <ul>
         {isEnt ? (
           <>
-            <li>
-              Launch price {inr(E.price)}/month instead of {inr(E.mrp)}/month.
-            </li>
-            <li>Extra access or employees: {inr(E.extraPrice)} each per month, on any module.</li>
+            {accessNotes(E.modules).map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+            <li>Extra users are priced per module.</li>
+            <li>Extra organizations cost the same as the module: {orgPriceText()} per month each.</li>
           </>
         ) : (
           <>
             <li>3 access = 1 admin + 2 other users, included with every module.</li>
             <li>HRMS is billed at {inr(99)} per employee per month.</li>
+            <li>Extra organizations cost the same as the module: {orgPriceText()} per month each.</li>
           </>
         )}
         <li>Yearly billing saves 20% compared to paying monthly.</li>
         <li>18% GST is added on all plans.</li>
       </ul>
     </div>
+  );
+}
+
+/** "₹299 each / month" or "₹499 per 10 GB / month · +20 GB". */
+function ExtraRate({ mod, qty, m, cyc }) {
+  return (
+    <>
+      {inr(mod.extraPrice * m)} {extraRateUnit(mod)} / {cyc}
+      {mod.extraBlock && qty > 0 ? ` · +${qty * mod.extraBlock} GB` : ''}
+    </>
+  );
+}
+
+/** "Accounting ₹499, Marketing ₹999" — from the config. */
+const orgPriceText = () =>
+  CONFIG.individual
+    .filter((m) => m.orgPrice)
+    .map((m) => `${m.name} ${inr(m.orgPrice)}`)
+    .join(', ');
+
+/** Organization stepper — only for modules that allow extra organizations. */
+function OrgCell({ plan, mod, s, m, cyc, onQty }) {
+  if (!mod.orgPrice) {
+    return (
+      <td>
+        <span className="zero" title={`Organizations can't be added to ${mod.name}`}>—</span>
+      </td>
+    );
+  }
+  return (
+    <td>
+      <Stepper value={s.orgs} min={0} onChange={(v) => onQty(plan, mod.id, v, 'orgs')} />
+      <div className="rate">
+        {inr(mod.orgPrice * m)} per org / {cyc}
+      </div>
+    </td>
   );
 }

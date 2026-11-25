@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js';
+import { CONFIG, extraText } from './config.js';
 
 export const inr = (n) =>
   '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
@@ -14,23 +14,27 @@ export function initialState() {
     plan: 'individual',
     cycle: 'monthly',
     individual: Object.fromEntries(
-      CONFIG.individual.map((m) => [m.id, { on: false, qty: m.perUnit ? m.defaultQty : 0 }]),
+      CONFIG.individual.map((m) => [m.id, { on: false, qty: m.perUnit ? m.defaultQty : 0, orgs: 0 }]),
     ),
-    enterprise: Object.fromEntries(CONFIG.enterprise.modules.map((m) => [m.id, { qty: 0 }])),
+    enterprise: Object.fromEntries(CONFIG.enterprise.modules.map((m) => [m.id, { qty: 0, orgs: 0 }])),
   };
 }
 
 export const minQty = (plan, id) =>
   plan === 'individual' && CONFIG.individual.find((x) => x.id === id).perUnit ? 1 : 0;
 
-export const clampQty = (plan, id, val) =>
-  Math.max(minQty(plan, id), Math.min(100000, Math.floor(Number(val) || 0)));
+export const clampQty = (plan, id, val, field = 'qty') =>
+  Math.max(field === 'qty' ? minQty(plan, id) : 0, Math.min(100000, Math.floor(Number(val) || 0)));
+
+const orgCost = (m, s) => (m.orgPrice ? m.orgPrice * s.orgs : 0);
+const orgText = (s) => (s.orgs ? `+${s.orgs} org${s.orgs > 1 ? 's' : ''}` : '');
+const joinParts = (...p) => p.filter(Boolean).join(', ');
 
 /* ---------- pricing math (all base prices are monthly) ---------- */
 export function individualRows(state) {
   return CONFIG.individual.map((m) => {
     const s = state.individual[m.id];
-    const monthly = m.perUnit ? m.price * s.qty : m.price + m.extraPrice * s.qty;
+    const monthly = (m.perUnit ? m.price * s.qty : m.price + m.extraPrice * s.qty) + orgCost(m, s);
     return { m, s, monthly: s.on ? monthly : 0 };
   });
 }
@@ -38,12 +42,13 @@ export function individualRows(state) {
 export function enterpriseRows(state) {
   return CONFIG.enterprise.modules.map((m) => {
     const s = state.enterprise[m.id];
-    return { m, s, monthly: CONFIG.enterprise.extraPrice * s.qty };
+    return { m, s, monthly: m.extraPrice * s.qty + orgCost(m, s) };
   });
 }
 
 export function computeTotals(state) {
   let monthly;
+  let launch = 0; // monthly launch-offer discount (Enterprise)
   const items = [];
   if (state.plan === 'custom') {
     monthly = 0;
@@ -53,34 +58,38 @@ export function computeTotals(state) {
     rows
       .filter((r) => r.s.on)
       .forEach((r) => {
-        const detail = r.m.perUnit
-          ? `${r.s.qty} ${r.m.unitLabel}`
-          : r.s.qty
-            ? `${r.m.included} + ${r.s.qty} extra ${r.m.extraLabel}`
-            : r.m.included;
-        const short = r.m.perUnit ? ` (${r.s.qty} ${r.m.unitLabel})` : r.s.qty ? ` (+${r.s.qty} ${r.m.extraLabel})` : '';
+        const adds = joinParts(r.m.perUnit ? '' : r.s.qty ? extraText(r.m, r.s.qty) : '', orgText(r.s));
+        const detail = r.m.perUnit ? joinParts(`${r.s.qty} ${r.m.unitLabel}`, orgText(r.s)) : [r.m.included, adds].filter(Boolean).join(' · ');
+        const short = r.m.perUnit ? ` (${r.s.qty} ${r.m.unitLabel})` : adds ? ` (${adds})` : '';
         // [label, amount, module id, title, detail]
         items.push([r.m.name + short, r.monthly, r.m.id, r.m.name, detail]);
       });
   } else {
     const rows = enterpriseRows(state);
-    monthly = CONFIG.enterprise.price + rows.reduce((a, r) => a + r.monthly, 0);
-    items.push(['Enterprise suite (all 6 modules)', CONFIG.enterprise.price, null, 'Enterprise suite', 'All 6 modules included']);
+    const E = CONFIG.enterprise;
+    monthly = E.mrp + rows.reduce((a, r) => a + r.monthly, 0);
+    launch = E.mrp - E.price;
+    items.push(['Enterprise suite (all 6 modules)', E.mrp, null, 'Enterprise suite', 'All 6 modules included']);
     rows
-      .filter((r) => r.s.qty)
-      .forEach((r) =>
-        items.push([`${r.m.name} — +${r.s.qty} ${r.m.extraLabel}`, r.monthly, r.m.id, r.m.name, `+${r.s.qty} extra ${r.m.extraLabel}`]),
-      );
+      .filter((r) => r.s.qty || r.s.orgs)
+      .forEach((r) => {
+        const adds = joinParts(r.s.qty ? extraText(r.m, r.s.qty) : '', orgText(r.s));
+        items.push([`${r.m.name} — ${adds}`, r.monthly, r.m.id, r.m.name, adds]);
+      });
   }
   const m = monthsOf(state.cycle);
   const subtotal = monthly * m;
-  const discount = state.cycle === 'yearly' ? round2(subtotal * CONFIG.YEARLY_DISCOUNT) : 0;
-  const taxable = round2(subtotal - discount);
+  const launchDiscount = launch * m;
+  const net = subtotal - launchDiscount;
+  const discount = state.cycle === 'yearly' ? round2(net * CONFIG.YEARLY_DISCOUNT) : 0;
+  const taxable = round2(net - discount);
   const gst = round2(taxable * CONFIG.GST_RATE);
   const total = round2(taxable + gst);
   return {
-    monthly,
+    monthly, // per month, before the launch offer
+    netMonthly: monthly - launch, // per month, after the launch offer
     subtotal,
+    launchDiscount,
     discount,
     taxable,
     gst,
@@ -102,6 +111,7 @@ export function summaryText(state, t) {
     `Plan: ${planLabel(state)}`,
     ...t.items.map(([n, v]) => `- ${n}: ${inr(v)}`),
     `Subtotal: ${inr(t.subtotal)}`,
+    t.launchDiscount ? `Offer: -${inr(t.launchDiscount)}` : '',
     t.discount ? `Yearly discount: -${inr(t.discount)}` : '',
     `GST (18%): ${inr(t.gst)}`,
     `Total: ${inr(t.total)} / ${cycleWord(state.cycle)}`,
